@@ -1,4 +1,3 @@
-# import necessary libraries
 import os
 import torch
 import torch.nn.functional as F
@@ -10,6 +9,7 @@ import random
 import math
 from tqdm import tqdm
 
+# Core diffusion imports (minimal)
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler, 
@@ -85,7 +85,7 @@ def simple_tokenize(tokenizer, prompt):
 
 class SimpleDreamBoothTrainer:
     def __init__(self, 
-                 model_name="runwayml/stable-diffusion-v1-5",
+                 model_name="stabilityai/stable-diffusion-2-inpainting",  # Use inpainting model
                  rank=8,
                  learning_rate=1e-4,
                  device="cuda" if torch.cuda.is_available() else "cpu"):
@@ -187,13 +187,15 @@ class SimpleDreamBoothTrainer:
             masked_latents = self.vae.encode(masked_images).latent_dist.sample()
             masked_latents = masked_latents * self.vae.config.scaling_factor
         
-        # Resize masks to latent space
+        # Resize masks to latent space (64x64 for 512x512 images)
         masks_resized = F.interpolate(masks, size=(latents.shape[-2], latents.shape[-1]))
         
         # Get text embeddings
         with torch.no_grad():
             text_input_ids = simple_tokenize(self.tokenizer, prompts[0])  # Use first prompt
             text_embeddings = self.text_encoder(text_input_ids.to(self.device))[0]
+            # Expand to match batch size
+            text_embeddings = text_embeddings.expand(batch_size, -1, -1)
         
         # Sample noise and timesteps
         noise = torch.randn_like(latents)
@@ -203,11 +205,13 @@ class SimpleDreamBoothTrainer:
         # Add noise to latents
         noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
         
-        # Prepare input for inpainting (concatenate with mask and masked image)
+        # For inpainting model: concatenate noisy_latents, mask, and masked_latents
+        # Expected input shape: [batch_size, 9, height, width]
+        # 4 channels (noisy_latents) + 1 channel (mask) + 4 channels (masked_latents)
         noisy_latents_input = torch.cat([noisy_latents, masks_resized, masked_latents], dim=1)
         
         # Predict noise
-        noise_pred = self.unet(noisy_latents_input, timesteps, text_embeddings).sample
+        noise_pred = self.unet(noisy_latents_input, timesteps, encoder_hidden_states=text_embeddings).sample
         
         # Calculate loss
         loss = F.mse_loss(noise_pred, noise, reduction="mean")
@@ -229,14 +233,14 @@ class SimpleDreamBoothTrainer:
 def main():
     # Initialize trainer
     trainer = SimpleDreamBoothTrainer(
-        model_name="runwayml/stable-diffusion-v1-5",  # Use SD 1.5 (more stable)
+        model_name="stabilityai/stable-diffusion-2-inpainting",  # Use inpainting model
         rank=8,
         learning_rate=1e-4
     )
     
     # Train
     trainer.train(
-        data_dir="./data",  # Your data directory
+        data_dir="./data", 
         prompt="a photo of an ambulance vehicle",
         num_epochs=1,
         batch_size=1,
