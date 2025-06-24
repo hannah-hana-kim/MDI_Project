@@ -240,17 +240,16 @@ def main():
     # Train
     trainer.train(
         data_dir="./data", 
-        prompt="a photo of an ambulance vehicle",
-        num_epochs=1,
+        prompt="pictures of objects",
+        num_epochs=10,
         batch_size=1,
         max_steps=500
     )
     
     # Save weights
-    trainer.save_lora_weights("./output/simple_lora")
+    trainer.save_lora_weights("./output_model")
 
 if __name__ == "__main__":
     main()
 
 
-# replace the diffusion weights with my lora_weights and see how it's inpainting: baseline
