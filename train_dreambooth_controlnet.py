@@ -9,7 +9,7 @@ import random
 import math
 from tqdm import tqdm
 
-# Core diffusion imports (minimal)
+# core diffusion imports
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler, 
@@ -25,7 +25,7 @@ class SimpleDreamBoothDataset(Dataset):
         self.prompt = prompt
         self.resolution = resolution
         
-        # Get all image files
+        # get all image files
         self.image_paths = []
         for ext in ['*.jpg', '*.jpeg', '*.png']:
             self.image_paths.extend(list(self.data_dir.rglob(ext)))
@@ -229,11 +229,10 @@ class SimpleDreamBoothTrainer:
         torch.save(lora_state_dict, os.path.join(output_dir, "lora_weights.pth"))
         print(f"LoRA weights saved to {output_dir}")
 
-# Simple usage example
 def main():
     # Initialize trainer
     trainer = SimpleDreamBoothTrainer(
-        model_name="stabilityai/stable-diffusion-2-inpainting",  # Use inpainting model
+        model_name="stabilityai/stable-diffusion-2-inpainting", 
         rank=8,
         learning_rate=1e-4
     )
@@ -252,3 +251,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# replace the diffusion weights with my lora_weights and see how it's inpainting: baseline
